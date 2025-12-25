@@ -2,8 +2,6 @@ import asyncio
 import base64
 import json
 import os
-import tempfile
-import requests
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from dotenv import load_dotenv
@@ -17,7 +15,6 @@ load_dotenv()
 # Configuration des clients API
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 elevenlabs_client = ElevenLabs(api_key=os.getenv("ELEVENLABS_API_KEY"))
-DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY")
 
 # Configuration
 ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")
@@ -41,39 +38,19 @@ class CallSession:
     async def process_audio(self, audio_data: bytes):
         """Pipeline complet: STT → IA → TTS"""
         try:
-            # 1. Speech-to-Text avec Deepgram (300h/mois gratuit)
-            print("🎤 Transcription audio avec Deepgram...")
+            # 1. Speech-to-Text avec Groq Whisper (maintenant fonctionnel !)
+            print("🎤 Transcription audio avec Groq...")
+            audio_file = io.BytesIO(audio_data)
+            audio_file.name = "audio.wav"
             
-            # Création d'un fichier temporaire pour Deepgram
-            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_file:
-                tmp_file.write(audio_data)
-                tmp_path = tmp_file.name
-            
-            try:
-                # Appel à l'API Deepgram
-                headers = {
-                    'Authorization': f'Token {DEEPGRAM_API_KEY}',
-                    'Content-Type': 'audio/wav'
-                }
-                
-                with open(tmp_path, 'rb') as audio_file:
-                    response = requests.post(
-                        'https://api.deepgram.com/v1/listen?model=nova-2&language=fr&smart_format=true',
-                        headers=headers,
-                        data=audio_file
-                    )
-                
-                if response.status_code == 200:
-                    result = response.json()
-                    user_text = result['results']['channels'][0]['alternatives'][0]['transcript']
-                    print(f"👤 Utilisateur: {user_text}")
-                else:
-                    raise Exception(f"Deepgram error: {response.status_code} - {response.text}")
-                    
-            finally:
-                # Nettoyage du fichier temporaire
-                if os.path.exists(tmp_path):
-                    os.unlink(tmp_path)
+            transcription = groq_client.audio.transcriptions.create(
+                model="whisper-large-v3-turbo",
+                file=("audio.wav", audio_file, "audio/wav"),
+                language="fr",
+                response_format="json"
+            )
+            user_text = transcription.text
+            print(f"👤 Utilisateur: {user_text}")
             
             # 2. Génération de réponse avec Groq
             print("🤖 Génération réponse IA...")
@@ -197,8 +174,8 @@ async def root():
     </head>
     <body>
         <div class="container">
-            <h1>🤖 Test IA Téléphonique (100% Gratuit)</h1>
-            <p>STT: Deepgram | IA: Groq Llama | TTS: ElevenLabs</p>
+            <h1>🤖 Test IA Téléphonique (Avec carte bancaire Groq)</h1>
+            <p>STT: Groq Whisper | IA: Groq Llama | TTS: ElevenLabs</p>
             <div id="status" class="status disconnected">❌ Déconnecté</div>
             
             <button id="connectBtn" onclick="connect()">Connecter WebSocket</button>
