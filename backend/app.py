@@ -4,9 +4,7 @@ import json
 import os
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
-import openai
 from groq import Groq
 from elevenlabs import ElevenLabs
 import io
@@ -14,8 +12,7 @@ import io
 # Chargement des variables d'environnement
 load_dotenv()
 
-# Configuration des clients API
-openai_client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Configuration des clients API (on n'utilise plus OpenAI)
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 elevenlabs_client = ElevenLabs(api_key=os.getenv("ELEVENLABS_API_KEY"))
 
@@ -41,15 +38,16 @@ class CallSession:
     async def process_audio(self, audio_data: bytes):
         """Pipeline complet: STT → IA → TTS"""
         try:
-            # 1. Speech-to-Text avec Whisper
-            print("🎤 Transcription audio...")
+            # 1. Speech-to-Text avec Groq Whisper (gratuit)
+            print("🎤 Transcription audio avec Groq...")
             audio_file = io.BytesIO(audio_data)
             audio_file.name = "audio.wav"
             
-            transcription = openai_client.audio.transcriptions.create(
-                model="whisper-1",
-                file=audio_file,
-                language="fr"
+            transcription = groq_client.audio.transcriptions.create(
+                model="whisper-large-v3-turbo",
+                file=("audio.wav", audio_file, "audio/wav"),
+                language="fr",
+                response_format="json"
             )
             user_text = transcription.text
             print(f"👤 Utilisateur: {user_text}")
@@ -176,7 +174,8 @@ async def root():
     </head>
     <body>
         <div class="container">
-            <h1>🤖 Test IA Téléphonique</h1>
+            <h1>🤖 Test IA Téléphonique (100% Gratuit)</h1>
+            <p>STT: Groq Whisper | IA: Groq Llama | TTS: ElevenLabs</p>
             <div id="status" class="status disconnected">❌ Déconnecté</div>
             
             <button id="connectBtn" onclick="connect()">Connecter WebSocket</button>
