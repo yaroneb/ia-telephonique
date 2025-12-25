@@ -1,0 +1,28 @@
+# Environnement virtuel
+venv/
+env/
+ENV/
+
+# Variables d'environnement (clés API)
+.env
+backend/.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
